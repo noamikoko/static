@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>פיטנס 5X - תוכנית אימונים אינטראקטיבית</title>
+    
+    <!-- PWA Setup (Manifest embedded via Data URI) -->
+    <meta name="theme-color" content="#0b0f19">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="פיטנס 5X">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232563eb'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='white'>💪</text></svg>">
+    
+    <script>
+        // Generate a dynamic manifest
+        const manifestData = {
+            "name": "פיטנס 5X - תוכנית אימונים",
+            "short_name": "פיטנס 5X",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#0b0f19",
+            "theme_color": "#0b0f19",
+            "icons": [{
+                "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232563eb'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='white'>💪</text></svg>",
+                "sizes": "192x192 512x512",
+                "type": "image/svg+xml"
+            }]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifestData)], {type: 'application/json'});
+        const manifestURL = URL.createObjectURL(manifestBlob);
+        const manifestLink = document.createElement('link');
+        manifestLink.rel = 'manifest';
+        manifestLink.href = manifestURL;
+        document.head.appendChild(manifestLink);
+
+        // Simple inline Service Worker
+        const swCode = `
+            self.addEventListener('install', (e) => {
+                self.skipWaiting();
+            });
+            self.addEventListener('activate', (e) => {
+                e.waitUntil(clients.claim());
+            });
+            self.addEventListener('fetch', (e) => {
+                // Pass through, no caching needed since it's a single file
+                e.respondWith(fetch(e.request).catch(() => new Response('Offline mode')));
+            });
+        `;
+        const swBlob = new Blob([swCode], {type: 'application/javascript'});
+        const swURL = URL.createObjectURL(swBlob);
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register(swURL)
+                    .then(reg => console.log('SW registered inline'))
+                    .catch(err => console.log('SW reg failed: ', err));
+            });
+        }
+    </script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Rubik) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Rubik', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            950: '#030712',
+                        },
+                        dark: {
+                            card: '#1f2937',
+                            bg: '#111827',
+                            border: '#374151'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0b0f19;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Custom scrollbar for day navigation */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* Keyframe animations */
+        @keyframes pulse-soft {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .pulse-active {
+            animation: pulse-soft 2s infinite;
+        }
+    </style>
+</head>
+<body class="text-slate-100 font-sans min-h-screen pb-12 antialiased">
+
+    <!-- Canvas for Confetti -->
+    <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none z-50 w-full h-full"></canvas>
+
+    <div class="max-w-md mx-auto px-4 pt-6">
+        
+        <!-- Header -->
+        <header class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-3">
+                <div class="bg-brand-600 p-2.5 rounded-xl shadow-lg shadow-brand-600/30">
+                    <!-- Dumbbell Icon SVG -->
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.5 10.5h11M6.5 13.5h11M3 9h3v6H3V9zm15 0h3v6h-3V9zM7.5 7h9v10h-9V7z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-black tracking-tight text-white">FITNESS 5X</h1>
+                    <p class="text-xs text-slate-400">המאמן האישי הדיגיטלי שלך</p>
+                </div>
+            </div>
+            <div id="date-badge" class="bg-dark-card border border-dark-border px-3 py-1.5 rounded-xl text-xs text-slate-300 font-medium">
+                טוען תאריך...
+            </div>
+        </header>
+
+        <!-- Circular/Horizontal Day Selector -->
+        <div class="mb-5">
+            <div class="flex gap-2 overflow-x-auto no-scrollbar py-1">
+                <button onclick="switchDay(0)" id="btn-day-0" class="flex-1 min-w-[72px] py-3 rounded-2xl flex flex-col items-center justify-center transition-all border border-dark-border bg-dark-card text-slate-400">
+                    <span class="text-xs">יום</span>
+                    <span class="text-base font-bold">ראשון</span>
+                </button>
+                <button onclick="switchDay(1)" id="btn-day-1" class="flex-1 min-w-[72px] py-3 rounded-2xl flex flex-col items-center justify-center transition-all border border-dark-border bg-dark-card text-slate-400">
+                    <span class="text-xs">יום</span>
+                    <span class="text-base font-bold">שני</span>
+                </button>
+                <button onclick="switchDay(2)" id="btn-day-2" class="flex-1 min-w-[72px] py-3 rounded-2xl flex flex-col items-center justify-center transition-all border border-dark-border bg-dark-card text-slate-400">
+                    <span class="text-xs">יום</span>
+                    <span class="text-base font-bold">שלישי</span>
+                </button>
+                <button onclick="switchDay(3)" id="btn-day-3" class="flex-1 min-w-[72px] py-3 rounded-2xl flex flex-col items-center justify-center transition-all border border-dark-border bg-dark-card text-slate-400">
+                    <span class="text-xs">יום</span>
+                    <span class="text-base font-bold">רביעי</span>
+                </button>
+                <button onclick="switchDay(4)" id="btn-day-4" class="flex-1 min-w-[72px] py-3 rounded-2xl flex flex-col items-center justify-center transition-all border border-dark-border bg-dark-card text-slate-400">
+                    <span class="text-xs">יום</span>
+                    <span class="text-base font-bold">חמישי</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Progress & Total Workout Timer Grid -->
+        <div class="grid grid-cols-2 gap-3 mb-5">
+            <!-- Progress Tracker Section -->
+            <div class="bg-dark-card border border-dark-border rounded-3xl p-4 relative overflow-hidden flex flex-col justify-between">
+                <div class="absolute top-0 left-0 w-1.5 h-full bg-brand-500"></div>
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <h2 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">התקדמות יומית</h2>
+                        <p id="progress-text" class="text-lg font-black text-white mt-0.5">0% הושלם</p>
+                    </div>
+                    <!-- Status Icon to show on completion -->
+                    <svg id="status-icon" class="w-5 h-5 text-slate-500 mt-1" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"></svg>
+                </div>
+                <!-- Progress Bar -->
+                <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden mt-2">
+                    <div id="progress-bar" class="bg-gradient-to-l from-brand-500 to-cyan-400 h-full w-0 transition-all duration-500 rounded-full"></div>
+                </div>
+            </div>
+
+            <!-- Global Stopwatch (Workout Duration) -->
+            <div class="bg-dark-card border border-dark-border rounded-3xl p-4 relative overflow-hidden flex flex-col justify-between">
+                <div class="absolute top-0 left-0 w-1.5 h-full bg-amber-500"></div>
+                <div>
+                    <h2 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">זמן אימון כוח (יעד: 30 דק')</h2>
+                    <p id="stopwatch-display" class="text-lg font-black text-amber-400 mt-0.5 tabular-nums">00:00</p>
+                </div>
+                <div class="flex items-center gap-2 mt-2">
+                    <button onclick="toggleStopwatch()" id="btn-stopwatch-toggle" class="text-[10px] font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-2 py-1 rounded-lg transition-colors border border-amber-500/20">
+                        התחל שעון
+                    </button>
+                    <button onclick="resetStopwatch()" class="text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg transition-colors">
+                        אפס
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Timer Section -->
+        <div class="bg-dark-card border border-dark-border rounded-3xl p-5 mb-6 text-center relative">
+            <!-- Mute/Sound Control Toggle -->
+            <button onclick="toggleMute()" id="btn-mute" class="absolute top-4 left-4 p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition-all active:scale-95" title="השתק/הפעל צליל">
+                <svg id="volume-icon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"/>
+                </svg>
+            </button>
+
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">טיימר מנוחה אינטראקטיבי</p>
+            
+            <div class="flex items-center justify-center gap-4 mb-4">
+                <!-- Subtract 10s Button -->
+                <button onclick="adjustTimer(-10)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 w-10 h-10 rounded-xl transition-all active:scale-95 font-bold text-sm">
+                    -10
+                </button>
+
+                <div id="timer-display" class="text-4xl font-extrabold tracking-widest text-white tabular-nums bg-slate-900/50 px-6 py-2 rounded-2xl border border-dark-border min-w-[140px]">
+                    01:00
+                </div>
+
+                <!-- Add 10s Button -->
+                <button onclick="adjustTimer(10)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 w-10 h-10 rounded-xl transition-all active:scale-95 font-bold text-sm">
+                    +10
+                </button>
+
+                <div class="flex flex-col gap-1 mr-2">
+                    <button onclick="toggleTimer()" id="btn-timer-control" class="bg-brand-600 hover:bg-brand-700 active:scale-95 text-white p-3 rounded-xl transition-all shadow-lg shadow-brand-600/20">
+                        <svg id="play-pause-icon" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </button>
+                    <button onclick="resetTimer()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-xl transition-all active:scale-95" title="איפוס טיימר">
+                        <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <!-- Preset Buttons -->
+            <div class="grid grid-cols-3 gap-2">
+                <button onclick="setTimerDuration(30)" class="preset-btn bg-slate-800/80 hover:bg-slate-850 border border-dark-border py-2 px-1 rounded-xl text-xs font-semibold text-slate-300 transition-all active:scale-95">
+                    30 שניות
+                </button>
+                <button onclick="setTimerDuration(60)" class="preset-btn ring-2 ring-brand-500 bg-brand-500/10 border border-brand-500 py-2 px-1 rounded-xl text-xs font-semibold text-brand-400 transition-all active:scale-95">
+                    60 שניות
+                </button>
+                <button onclick="setTimerDuration(90)" class="preset-btn bg-slate-800/80 hover:bg-slate-850 border border-dark-border py-2 px-1 rounded-xl text-xs font-semibold text-slate-300 transition-all active:scale-95">
+                    90 שניות
+                </button>
+            </div>
+        </div>
+
+        <!-- Custom Notification Toast -->
+        <div id="custom-toast" class="fixed bottom-6 left-4 right-4 bg-emerald-600 text-white px-5 py-4 rounded-2xl shadow-xl z-50 flex items-center justify-between transition-all duration-300 transform translate-y-24 opacity-0 pointer-events-none">
+            <span id="toast-message" class="text-sm font-bold">הטיימר הסתיים! הסט הבא מחכה לך 💪</span>
+            <button onclick="dismissToast()" class="bg-emerald-700 p-1.5 rounded-lg text-white">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Active Workout Content Container -->
+        <main id="workout-content" class="space-y-6">
+            <!-- Dynamic Injection of Workout Content via JS -->
+        </main>
+
+        <!-- Completion Modal -->
+        <div id="celebration-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+            <div class="bg-dark-card border border-dark-border rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl transform scale-95 transition-transform duration-300">
+                <div class="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-12 h-12 text-emerald-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-black text-white mb-2">כל הכבוד, אלוף!</h3>
+                <p class="text-sm text-slate-300 mb-6 leading-relaxed">
+                    סיימת את כל יעדי האימון להיום בהצלחה. שמירה על עקביות היא המפתח לתוצאות מעולות!
+                </p>
+                <button onclick="closeCelebration()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-2xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95">
+                    יש! סגור ונתראה מחר
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- App Logic Script -->
+    <script>
+        // Workout Database Setup
+        const workouts = [
+            {
+                dayName: "ראשון",
+                cardio: {
+                    type: "🚶‍♂️ הליכה בשיפוע",
+                    target: "שיפוע 12% | קצב 6 קמ\"ש | 30 דקות",
+                    notes: "מומלץ ללכת ללא אחיזה במעקות למקסום שריפת קלוריות."
+                },
+                strengthTitle: "גוף עליון - דחיפה וליבה",
+                exercises: [
+                    { 
+                        name: "שכיבות סמיכה (משקל גוף)", 
+                        target: "סטים של מקסימום חזרות מבוקרות", 
+                        sets: [false, false, false], 
+                        weight: "",
+                        tips: [
+                            "שמור על מרפקים בזווית של כ-45 מעלות מהגוף (אל תפתח אותם לצדדים לחלוטין כמו האות T).",
+                            "גוף ישר כמו קרש - כווץ את הישבן והבטן כדי למנוע מהאגן לשקוע למטה.",
+                            "רד עד שהחזה כמעט נוגע ברצפה ועלה לנעילה מבוקרת בטווח תנועה מלא."
+                        ]
+                    },
+                    { 
+                        name: "לחיצת כתפיים בעמידה (משקולות יד)", 
+                        target: "10-12 חזרות לסט", 
+                        sets: [false, false, false], 
+                        weight: "",
+                        tips: [
+                            "שמור על גב ישר והימנע מהקשתה מוגזמת של הגב התחתון (כווץ בטן חזק).",
+                            "הורד את המשקולות בשליטה עד לגובה האוזניים/סנטר ואז דחוף למעלה.",
+                            "אל תתקע את המרפקים בחוזקה בנעילה למעלה - שמור על נעילה רכה."
+                        ]
+                    },
+                    { 
+                        name: "פלאנק סטטי (בטן)", 
+                        target: "45-60 שניות לסט", 
+                        sets: [false, false, false], 
+                        weight: "",
+                        tips: [
+                            "דחוף את הרצפה חזק דרך האמות כדי שהשכמות לא ישקעו פנימה.",
+                            "שמור על צוואר ניטרלי - המבט צריך להיות מופנה לרצפה, לא קדימה.",
+                            "אל תרים את הישבן למעלה מדי ואל תתן לו ליפול - שמור על קו ישר אחד."
+                        ]
+                    }
+                ]
+            },
+            {
+                dayName: "שני",
+                cardio: {
+                    type: "🏃‍♂️ ריצה במישור",
+                    target: "קצב קל וקבוע (Zone 2 - קצב דיבור) | 30 דקות",
+                    notes: "מנוחה אקטיבית לשוקיים מהשיפוע. רוץ בקצב שמרני."
+                },
+                strengthTitle: "גוף עליון - משיכה",
+                exercises: [
+                    { 
+                        name: "מתח (או גרביטון / גומיית התנגדות)", 
+                        target: "סטים של מקסימום חזרות", 
+                        sets: [false, false, false], 
+                        weight: "",
+                        tips: [
+                            "התחל בתלייה פסיבית מלאה (שחרור כתפיים) ומשוך את הגוף למעלה על ידי הבאת החזה למוט.",
+                            "אל תשתמש בתנופה מהרגליים (קיפינג) - שמור על תנועה מבוקרת ואיטית.",
+                            "רד למטה בצורה מבוקרת (עבודה סנטימטרית שלילית) ואל תפיל את עצמך."
+                        ]
+                    },
+                    { 
+                        name: "חתירה בספסל עם משקולת יד (Dumbbell Row)", 
+                        target: "10-12 חזרות לכל צד", 
+                        sets: [false, false, false], 
+                        weight: "",
+                        tips: [
+                            "שמור על גב מקביל לרצפה וישר לחלוטין לאורך כל התנועה.",
+                            "משוך את המשקולת לכיוון המותן ולא לכיוון החזה כדי למקסם גיוס של שריר הרחב-גבי (הגב).",
+                            "בצע כיווץ חזק של השכמה בשיא התנועה ושחרר לאט."
+                        ]
+                    },
+                    { 
+                        name: "כפיפות מרפקים (יד קדמית עם משקולות)", 
+                        target: "12 חזרות לסט", 
+                        sets: [false, false, false], 
+                        weight: "",
+                        tips: [
+                            "הצמד את המרפקים לצדי הגוף ואל תתן להם לזוז קדימה או אחורה בזמן העלייה.",
+                            "מנע לחלוטין שימוש בתנופה של הגב (בלי 'לזרוק' את המשקל עם המותן).",
+                            "סובב את שורש כף היד כלפי מעלה (סופינציה) בשיא התנועה לכיווץ מקסימלי."
+                        ]
+                    }
+                ]
+            },
+            {
+                dayName: "שלישי",
+                cardio: {
+                    type: "🚶‍♂️ הליכה בשיפוע",
+                    target: "שיפוע 12% | קצב 6 קמ\"ש | 30 דקות",
+                    notes: "הקפד על נשימה קבועה וקצבית (רצוי מהאף)."
+                },
+                strengthTitle: "גוף תחתון וליבה פונקציונלי",
+                exercises: [
+                    { 
+                        name: "לאנצ'ים / מכרעים במקום (אפשר עם משקולות)", 
+                        target: "10 צעדים לכל רגל", 
+                        sets: [false, false, false], 
+                        weight: "",
+                        tips: [
+                            "בצע צעד רחב מספיק כדי שבעת הירידה הברך הקדמית שלך לא תעבור את קו אצבעות הרגליים.",
+                            "רד בצורה אנכית ישר למטה (כאילו הגב מחליק על קיר אחורי).",
+                            "שמור על חזה מורם ומבט קדימה כדי לשמור על שיווי משקל."
+                        ]
+                    },
+                    { 
+                        name: "דדליפט רומני עם משקולות יד (Dumbbell RDL)", 
+                        target: "12 חזרות (דגש על ישבן וירך אחורית)", 
+                        sets: [false, false, false], 
+                        weight: "",
+                        tips: [
+                            "התנועה מתחילה בדחיפת הישבן לאחור (ציר ירך Hip Hinge) ולא בכיפוף הברכיים.",
+                            "שמור על משקולות היד קרובות מאוד לירכיים ולשוקיים לאורך כל הירידה.",
+                            "רד עד שאתה מרגיש מתיחה חזקה בירך האחורית, וכווץ את הישבן כדי לחזור לעמידה."
+                        ]
+                    },
+                    { 
+                        name: "בטן - הרמות ברכיים לחזה בתלייה או שכיבה", 
+                        target: "15 חזרות איטיות", 
+                        sets: [false, false, false], 
+                        weight: "",
+                        tips: [
+                            "הרם את הברכיים בעזרת שרירי הבטן התחתונה ולא על ידי מומנטום של הרגליים.",
+                            "הורד את הרגליים באיטיות מבוקרת מאוד כדי למנוע התנדנדות של הגוף קדימה ואחורה.",
+                            "נסה להביא את האגן לכיפוף קל קדימה בשיא הגובה לכיווץ בטן עמוק."
+                        ]
+                    }
+                ]
+            },
+            {
+                dayName: "רביעי",
+                cardio: {
+                    type: "🏃‍♂️ ריצה במישור",
+                    target: "קצב קל וקבוע (Zone 2) | 30 דקות",
+                    notes: "שמור על ריצה קלילה וטבעית להזרמת חמצן לשרירים."
+                },
+                strengthTitle: "גוף עליון - מיקס מהיר",
+                exercises: [
+                    { 
+                        name: "שכיבות סמיכה (גיוון אחיזה רחבה/צרה)", 
+                        target: "סטים של מקסימום חזרות", 
+                        sets: [false, false, false], 
+                        weight: "",
+                        tips: [
+                            "אחיזה רחבה נותנת דגש חזק יותר לחזה החיצוני; אחיזה צרה נותנת דגש חזק ליד האחורית (תלת-ראשי).",
+                            "באחיזה צרה, שמור על המרפקים צמודים לגוף לאורך כל התנועה.",
+                            "הקפד על נשיפה (הוצאת אוויר) בשלב העלייה הקשה."
+                        ]
+                    },
+                    { 
+                        name: "מתח או חתירה כנגד ספסל", 
+                        target: "סטים של מקסימום חזרות", 
+                        sets: [false, false, false], 
+                        weight: "",
+                        tips: [
+                            "שמור על בית חזה פתוח ומורם לאורך כל התרגיל.",
+                            "התרכז במשיכה דרך המרפקים למטה ואחורה (ולא דרך כפות הידיים) כדי להרגיש את הגב.",
+                            "שחרר את השכמות באיטיות בחלק התחתון של התנועה."
+                        ]
+                    },
+                    { 
+                        name: "הרחקה צידית של משקולות יד (כתפיים)", 
+                        target: "12-15 חזרות (משקל קל בלבד)", 
+                        sets: [false, false, false], 
+                        weight: "",
+                        tips: [
+                            "הובל את התנועה דרך המרפקים ולא דרך כפות הידיים.",
+                            "עלה עד לגובה הכתפיים בלבד (זווית של כ-90 מעלות) - מעבר לכך מפעיל את שריר הטרפז במקום הכתף.",
+                            "שמור על כיפוף קל וקבוע במרפקים לאורך כל הסט."
+                        ]
+                    }
+                ]
+            },
+            {
+                dayName: "חמישי",
+                cardio: {
+                    type: "🚶‍♂️ הליכה בשיפוע",
+                    target: "שיפוע 12% | קצב 6 קמ\"ש | 30 דקות",
+                    notes: "האימון האחרון לשבוע! תן את הכל."
+                },
+                strengthTitle: "אימון סיום שבוע פונקציונלי",
+                exercises: [
+                    { 
+                        name: "סקוואט חופשי (או גובלט סקוואט)", 
+                        target: "15 חזרות מבוקרות", 
+                        sets: [false, false, false], 
+                        weight: "",
+                        tips: [
+                            "שמור על משקל הגוף במרכז כף היד ועל העקבים (אל תרים עקבים באוויר).",
+                            "דחוף את הברכיים החוצה בקו ישר עם אצבעות הרגליים כדי למנוע קריסה פנימה.",
+                            "רד לפחות עד לגובה שבו הירך מקבילה לרצפה, תוך שמירה על גב ישר וחזה מורם."
+                        ]
+                    },
+                    { 
+                        name: "לחיצת חזה עם משקולות יד על ספסל", 
+                        target: "10-12 חזרות לסט", 
+                        sets: [false, false, false], 
+                        weight: "",
+                        tips: [
+                            "כווץ והצמד את השכמות שלך לספסל וצור קשת קלה ובריאה בגב התחתון כדי לייצב את הכתפיים.",
+                            "הורד את המשקולות בנתיב אלכסוני מעט עד לחלק התחתון של החזה.",
+                            "דחוף למעלה ולמרכז בלי לתת למשקולות להתנגש זו בזו בשיא התנועה."
+                        ]
+                    },
+                    { 
+                        name: "פלאנק צידי (מייצבי ליבה)", 
+                        target: "30-45 שניות לכל צד", 
+                        sets: [false, false], 
+                        weight: "",
+                        tips: [
+                            "מקם את המרפק בדיוק מתחת לקו הכתף כדי למנוע עומס מפרקי מיותר.",
+                            "דחוף את האגן חזק למעלה וקדימה - הגוף צריך ליצור קו ישר לחלוטין מהראש ועד העקבים.",
+                            "הקפד על נשימה קבועה ושטוחה ולא עצירת נשימה."
+                        ]
+                    }
+                ]
+            }
+        ];
+
+        // Storage Key
+        const STORAGE_KEY = 'fitness5x_workout_state_v2';
+
+        // App States
+        let currentDay = 0; // Default: Sunday (index 0)
+        let timerInterval = null;
+        let timerSeconds = 60;
+        let timerPreset = 60;
+        let isTimerRunning = false;
+        let isMuted = false;
+
+        // Stopwatch States
+        let stopwatchInterval = null;
+        let stopwatchSeconds = 0;
+        let isStopwatchRunning = false;
+
+        // Load State from LocalStorage
+        function loadState() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    // Match saved states back to our main workouts array
+                    parsed.forEach((savedWorkout, wIdx) => {
+                        if (workouts[wIdx]) {
+                            savedWorkout.exercises.forEach((savedEx, exIdx) => {
+                                if (workouts[wIdx].exercises[exIdx]) {
+                                    // Load checked sets
+                                    if (Array.isArray(savedEx.sets)) {
+                                        savedEx.sets.forEach((val, sIdx) => {
+                                            if (sIdx < workouts[wIdx].exercises[exIdx].sets.length) {
+                                                workouts[wIdx].exercises[exIdx].sets[sIdx] = val;
+                                            }
+                                        });
+                                    }
+                                    // Load weight
+                                    if (savedEx.weight !== undefined) {
+                                        workouts[wIdx].exercises[exIdx].weight = savedEx.weight;
+                                    }
+                                }
+                            });
+                        }
+                    });
+                } catch (e) {
+                    console.error("Error parsing saved state", e);
+                }
+            }
+        }
+
+        // Save State to LocalStorage
+        function saveState() {
+            const stateToSave = workouts.map(w => ({
+                exercises: w.exercises.map(ex => ({
+                    sets: ex.sets,
+                    weight: ex.weight
+                }))
+            }));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+        }
+
+        // Sound Engine (Web Audio API)
+        function playChime() {
+            if (isMuted) return;
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const ctx = new AudioContext();
+                
+                const playBeep = (time, pitch, duration) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(pitch, time);
+                    gain.gain.setValueAtTime(0.12, time);
+                    gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(time);
+                    osc.stop(time + duration);
+                };
+
+                const now = ctx.currentTime;
+                playBeep(now, 587.33, 0.2); // D5
+                playBeep(now + 0.15, 880.00, 0.4); // A5
+            } catch (e) {
+                console.log("Audio play blocked or not supported");
+            }
+        }
+
+        // Toggle Mute State
+        function toggleMute() {
+            isMuted = !isMuted;
+            const volIcon = document.getElementById('volume-icon');
+            if (isMuted) {
+                volIcon.innerHTML = `
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6L4.72 4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"/>
+                `;
+                volIcon.classList.add('text-red-400');
+            } else {
+                volIcon.innerHTML = `
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"/>
+                `;
+                volIcon.classList.remove('text-red-400');
+            }
+        }
+
+        // Initialize App
+        window.addEventListener('DOMContentLoaded', () => {
+            // Set dynamic date
+            const daysOfWeekHebrew = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+            const today = new Date();
+            const dayName = daysOfWeekHebrew[today.getDay()];
+            const dateString = today.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' });
+            document.getElementById('date-badge').innerText = `יום ${dayName}, ${dateString}`;
+
+            // Load saved state from storage
+            loadState();
+
+            // Auto select today's workout if Sun-Thu (0-4), default to Sunday (0) for Fri/Sat
+            let targetDay = today.getDay();
+            if (targetDay > 4) {
+                targetDay = 0; // Default to Sunday on weekend
+            }
+            switchDay(targetDay);
+            setupConfetti();
+        });
+
+        // Switch active day view
+        function switchDay(dayIndex) {
+            currentDay = dayIndex;
+            
+            // Toggle active tabs styling
+            for (let i = 0; i < 5; i++) {
+                const btn = document.getElementById(`btn-day-${i}`);
+                if (btn) {
+                    if (i === dayIndex) {
+                        btn.className = "flex-1 min-w-[72px] py-3 rounded-2xl flex flex-col items-center justify-center transition-all border border-brand-500 bg-brand-500/10 text-brand-400 font-extrabold ring-1 ring-brand-500/30";
+                    } else {
+                        btn.className = "flex-1 min-w-[72px] py-3 rounded-2xl flex flex-col items-center justify-center transition-all border border-dark-border bg-dark-card text-slate-400 hover:text-slate-200";
+                    }
+                }
+            }
+
+            // Render current workout card details
+            renderWorkout(workouts[dayIndex]);
+            updateProgress();
+        }
+
+        // Handle weight change and save
+        function handleWeightChange(exerciseIndex, input) {
+            workouts[currentDay].exercises[exerciseIndex].weight = input.value;
+            saveState();
+        }
+
+        // Render workout exercises dynamically
+        function renderWorkout(workout) {
+            const container = document.getElementById('workout-content');
+            container.innerHTML = `
+                <!-- CARDIO PART -->
+                <section class="bg-dark-card border border-dark-border rounded-3xl p-5 shadow-lg">
+                    <div class="flex items-center gap-2.5 mb-3">
+                        <span class="text-xs font-bold text-brand-400 bg-brand-500/10 border border-brand-500/30 px-2.5 py-1 rounded-full uppercase tracking-wide">חלק א'</span>
+                        <h3 class="text-base font-extrabold text-white">אימון אירובי יומי (30 דק')</h3>
+                    </div>
+                    
+                    <div class="bg-slate-900/60 border border-dark-border p-4 rounded-2xl flex items-start gap-3.5 mb-3">
+                        <div class="text-3xl select-none mt-1">
+                            ${workout.cardio.type.includes("הליכה") ? "🚶‍♂️" : "🏃‍♂️"}
+                        </div>
+                        <div>
+                            <h4 class="text-lg font-bold text-slate-100">${workout.cardio.type}</h4>
+                            <p class="text-sm font-semibold text-emerald-400 mt-0.5">${workout.cardio.target}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-2 text-xs text-slate-400 bg-slate-900/30 p-3 rounded-xl border border-dark-border/50">
+                        <span class="text-brand-400 font-bold">💡 טיפ:</span>
+                        <span>${workout.cardio.notes}</span>
+                    </div>
+                </section>
+
+                <!-- STRENGTH PART -->
+                <section class="bg-dark-card border border-dark-border rounded-3xl p-5 shadow-lg">
+                    <div class="flex items-center justify-between mb-5">
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-xs font-bold text-brand-400 bg-brand-500/10 border border-brand-500/30 px-2.5 py-1 rounded-full uppercase tracking-wide">חלק ב'</span>
+                            <h3 class="text-base font-extrabold text-white">${workout.strengthTitle}</h3>
+                        </div>
+                    </div>
+
+                    <div class="space-y-5">
+                        ${workout.exercises.map((ex, exIdx) => `
+                            <div class="bg-slate-900/40 p-4 rounded-2xl border border-dark-border/70 relative">
+                                <div class="flex justify-between items-start mb-3.5 gap-2">
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-2">
+                                            <h4 class="text-base font-bold text-white leading-snug">${ex.name}</h4>
+                                            ${ex.tips ? `
+                                                <button onclick="toggleTips(${exIdx})" class="text-amber-400 hover:text-amber-300 transition-colors bg-amber-400/10 hover:bg-amber-400/20 p-1.5 rounded-lg active:scale-95" title="הצג טיפים ודגשים">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                                                    </svg>
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                        <p class="text-xs text-slate-400 mt-1">${ex.target}</p>
+                                    </div>
+                                    <!-- Weight Input -->
+                                    <div class="flex flex-col items-end min-w-[75px]">
+                                        <label class="text-[10px] text-slate-400 font-bold mb-0.5">משקל (ק"ג)</label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="--" 
+                                            value="${ex.weight || ''}" 
+                                            oninput="handleWeightChange(${exIdx}, this)"
+                                            class="w-16 bg-slate-800 text-center text-xs font-bold text-slate-100 px-2 py-1 rounded-lg border border-dark-border focus:border-brand-500 focus:outline-none"
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <!-- Collapsible Tips Block -->
+                                ${ex.tips ? `
+                                    <div id="tips-box-${exIdx}" class="hidden my-3 p-3.5 bg-slate-900/80 border border-amber-500/20 rounded-xl text-xs text-slate-300 transition-all">
+                                        <div class="font-bold text-amber-400 flex items-center gap-1.5 mb-2 border-b border-dark-border/40 pb-1.5">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                                            </svg>
+                                            <span>דגשים לביצוע נכון ומניעת פציעות:</span>
+                                        </div>
+                                        <ul class="list-disc list-inside space-y-1.5 text-slate-200 leading-relaxed pr-1">
+                                            ${ex.tips.map(tip => `<li>${tip}</li>`).join('')}
+                                        </ul>
+                                    </div>
+                                ` : ''}
+                                
+                                <!-- Sets Grid -->
+                                <div class="grid grid-cols-3 gap-2">
+                                    ${ex.sets.map((isDone, setIdx) => `
+                                        <button 
+                                            onclick="toggleSet(${exIdx}, ${setIdx})" 
+                                            class="set-button flex items-center justify-between py-2.5 px-3 rounded-xl border transition-all active:scale-95 text-xs font-medium ${
+                                                isDone 
+                                                ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold' 
+                                                : 'bg-slate-800/50 border-dark-border text-slate-400 hover:border-slate-600'
+                                            }"
+                                        >
+                                            <span>סט ${setIdx + 1}</span>
+                                            <div class="w-4 h-4 rounded-full border flex items-center justify-center ${
+                                                isDone 
+                                                ? 'border-emerald-500 bg-emerald-500 text-dark-bg' 
+                                                : 'border-slate-500'
+                                            }">
+                                                ${isDone ? `
+                                                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                                                    </svg>
+                                                ` : ''}
+                                            </div>
+                                        </button>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <!-- Reset Options at Bottom -->
+                    <div class="mt-6 pt-5 border-t border-dark-border/60 flex justify-between gap-3">
+                        <button onclick="resetDayProgress()" class="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-xs font-bold text-slate-300 transition-all border border-dark-border/80">
+                            איפוס אימון היום
+                        </button>
+                        <button onclick="confirmResetAll()" class="flex-1 py-2 px-3 rounded-xl bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-900/30 active:scale-95 text-xs font-bold transition-all">
+                            איפוס כל השבוע
+                        </button>
+                    </div>
+                </section>
+            `;
+        }
+
+        // Toggle tips box visibility
+        function toggleTips(exerciseIndex) {
+            const tipsBox = document.getElementById(`tips-box-${exerciseIndex}`);
+            if (tipsBox) {
+                tipsBox.classList.toggle('hidden');
+            }
+        }
+
+        // Toggle state of a particular set
+        function toggleSet(exerciseIndex, setIndex) {
+            const workout = workouts[currentDay];
+            workout.exercises[exerciseIndex].sets[setIndex] = !workout.exercises[exerciseIndex].sets[setIndex];
+            
+            // Auto start workout stopwatch if first set ever is checked
+            if (workout.exercises[exerciseIndex].sets[setIndex] === true && !isStopwatchRunning && stopwatchSeconds === 0) {
+                toggleStopwatch();
+            }
+
+            // Re-render & Save
+            saveState();
+            renderWorkout(workout);
+            updateProgress();
+
+            // Auto-trigger rest timer if set is checked to 'done' (positive workflow!)
+            if (workout.exercises[exerciseIndex].sets[setIndex] === true) {
+                resetTimer();
+                toggleTimer();
+            }
+        }
+
+        // Calculate and update progress indicators
+        function updateProgress() {
+            const workout = workouts[currentDay];
+            let totalSets = 0;
+            let completedSets = 0;
+
+            workout.exercises.forEach(ex => {
+                totalSets += ex.sets.length;
+                ex.sets.forEach(done => {
+                    if (done) completedSets++;
+                });
+            });
+
+            const percent = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
+            
+            // Update UI Elements safely to prevent JavaScript crashing when elements are omitted
+            const progressBar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('progress-text');
+            const statusIcon = document.getElementById('status-icon');
+
+            if (progressBar) progressBar.style.width = `${percent}%`;
+            if (progressText) progressText.innerText = `${percent}% הושלם`;
+
+            if (statusIcon) {
+                // Style/Icon adjustments depending on progression
+                if (percent === 100) {
+                    statusIcon.innerHTML = `
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+                    `;
+                    statusIcon.className = "w-5 h-5 text-emerald-400 mt-1 transition-colors duration-300";
+                } else if (percent > 0) {
+                    statusIcon.innerHTML = `
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    `;
+                    statusIcon.className = "w-5 h-5 text-brand-500 mt-1 transition-colors duration-300";
+                } else {
+                    statusIcon.innerHTML = `
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    `;
+                    statusIcon.className = "w-5 h-5 text-slate-500 mt-1 transition-colors duration-300";
+                }
+            }
+
+            if (percent === 100) {
+                // Show celebration popup and start confetti
+                triggerCelebration();
+                // Pause the total workout stopwatch as they have completed the exercises
+                if (isStopwatchRunning) {
+                    toggleStopwatch();
+                }
+            }
+        }
+
+        // Rest Timer Logic Functions
+        function formatTime(sec) {
+            const minutes = Math.floor(sec / 60);
+            const seconds = sec % 60;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function setTimerDuration(duration) {
+            timerPreset = duration;
+            resetTimer();
+            
+            // Adjust visual selected styling for presets
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.className = "preset-btn bg-slate-800/80 hover:bg-slate-850 border border-dark-border py-2 px-1 rounded-xl text-xs font-semibold text-slate-300 transition-all active:scale-95";
+                if(btn.innerText.includes(duration.toString())) {
+                    btn.className = "preset-btn ring-2 ring-brand-500 bg-brand-500/10 border border-brand-500 py-2 px-1 rounded-xl text-xs font-semibold text-brand-400 transition-all active:scale-95";
+                }
+            });
+        }
+
+        // Adjust timer seconds directly (plus/minus 10s)
+        function adjustTimer(amount) {
+            if (isTimerRunning) {
+                // If running, adjust current remaining seconds
+                timerSeconds = Math.max(0, timerSeconds + amount);
+                document.getElementById('timer-display').innerText = formatTime(timerSeconds);
+            } else {
+                // If not running, adjust preset and reset
+                timerPreset = Math.max(0, timerPreset + amount);
+                resetTimer();
+            }
+        }
+
+        function toggleTimer() {
+            const btnIcon = document.getElementById('play-pause-icon');
+            const timerDisplay = document.getElementById('timer-display');
+
+            if (isTimerRunning) {
+                // Pause Timer
+                clearInterval(timerInterval);
+                isTimerRunning = false;
+                timerDisplay.classList.remove('pulse-active', 'text-brand-400');
+                btnIcon.innerHTML = `
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                `;
+            } else {
+                // Start Timer
+                isTimerRunning = true;
+                timerDisplay.classList.add('pulse-active', 'text-brand-400');
+                btnIcon.innerHTML = `
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                `;
+
+                timerInterval = setInterval(() => {
+                    timerSeconds--;
+                    timerDisplay.innerText = formatTime(timerSeconds);
+
+                    if (timerSeconds <= 0) {
+                        clearInterval(timerInterval);
+                        isTimerRunning = false;
+                        resetTimer();
+                        playChime();
+                        showToast("הטיימר הסתיים! הסט הבא מחכה לך 💪");
+                    }
+                }, 1000);
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isTimerRunning = false;
+            timerSeconds = timerPreset;
+            
+            const timerDisplay = document.getElementById('timer-display');
+            const btnIcon = document.getElementById('play-pause-icon');
+
+            timerDisplay.innerText = formatTime(timerSeconds);
+            timerDisplay.classList.remove('pulse-active', 'text-brand-400');
+            
+            btnIcon.innerHTML = `
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            `;
+        }
+
+        // Stopwatch / Global Workout Timer
+        function toggleStopwatch() {
+            const btn = document.getElementById('btn-stopwatch-toggle');
+            const display = document.getElementById('stopwatch-display');
+
+            if (isStopwatchRunning) {
+                // Pause
+                clearInterval(stopwatchInterval);
+                isStopwatchRunning = false;
+                btn.innerText = "המשך שעון";
+                btn.className = "text-[10px] font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-2 py-1 rounded-lg transition-colors border border-amber-500/20";
+                display.classList.remove('pulse-active');
+            } else {
+                // Start
+                isStopwatchRunning = true;
+                btn.innerText = "עצור שעון";
+                btn.className = "text-[10px] font-bold bg-red-500/10 hover:bg-red-500/20 text-red-400 px-2 py-1 rounded-lg transition-colors border border-red-500/20";
+                display.classList.add('pulse-active');
+
+                stopwatchInterval = setInterval(() => {
+                    stopwatchSeconds++;
+                    display.innerText = formatTime(stopwatchSeconds);
+                    
+                    // Alert at exactly 30 minutes!
+                    if (stopwatchSeconds === 1800) {
+                        playChime();
+                        showToast("עברו 30 דקות! מומלץ לסיים את התרגילים בקרוב 💪");
+                    }
+                }, 1000);
+            }
+        }
+
+        function resetStopwatch() {
+            clearInterval(stopwatchInterval);
+            isStopwatchRunning = false;
+            stopwatchSeconds = 0;
+            
+            const btn = document.getElementById('btn-stopwatch-toggle');
+            const display = document.getElementById('stopwatch-display');
+            
+            display.innerText = "00:00";
+            display.classList.remove('pulse-active');
+            btn.innerText = "התחל שעון";
+            btn.className = "text-[10px] font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-2 py-1 rounded-lg transition-colors border border-amber-500/20";
+        }
+
+        // Reset Current Day Progress
+        function resetDayProgress() {
+            const workout = workouts[currentDay];
+            workout.exercises.forEach(ex => {
+                ex.sets = ex.sets.map(() => false);
+                ex.weight = "";
+            });
+            saveState();
+            renderWorkout(workout);
+            updateProgress();
+            resetStopwatch();
+            showToast("אימון היום הבוצע אופס בהצלחה!");
+        }
+
+        // Confirm Reset All Weekly Progress
+        function confirmResetAll() {
+            const hasConfirmed = confirm("האם אתה בטוח שברצונך לאפס את הנתונים והמשקלים של כל השבוע?");
+            if (hasConfirmed) {
+                workouts.forEach(w => {
+                    w.exercises.forEach(ex => {
+                        ex.sets = ex.sets.map(() => false);
+                        ex.weight = "";
+                    });
+                });
+                saveState();
+                renderWorkout(workouts[currentDay]);
+                updateProgress();
+                resetStopwatch();
+                showToast("כל נתוני השבוע אופסו בהצלחה!");
+            }
+        }
+
+        // Custom Notification Toast Handlers
+        let toastTimeout;
+        function showToast(message) {
+            const toast = document.getElementById('custom-toast');
+            document.getElementById('toast-message').innerText = message;
+            
+            toast.classList.remove('translate-y-24', 'opacity-0', 'pointer-events-none');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                dismissToast();
+            }, 5000);
+        }
+
+        function dismissToast() {
+            const toast = document.getElementById('custom-toast');
+            toast.classList.remove('translate-y-0', 'opacity-100');
+            toast.classList.add('translate-y-24', 'opacity-0', 'pointer-events-none');
+        }
+
+        // Celebration and Confetti Logic
+        function triggerCelebration() {
+            const modal = document.getElementById('celebration-modal');
+            const modalBox = modal.querySelector('div');
+            
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            modalBox.classList.remove('scale-95');
+            modalBox.classList.add('scale-100');
+
+            isConfettiActive = true;
+            createConfettiShower();
+            setTimeout(() => {
+                isConfettiActive = false;
+            }, 4000);
+        }
+
+        function closeCelebration() {
+            const modal = document.getElementById('celebration-modal');
+            const modalBox = modal.querySelector('div');
+            
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            modalBox.classList.add('scale-95');
+            modalBox.classList.remove('scale-100');
+        }
+
+        // Canvas Confetti Code
+        let canvas, ctx;
+        let confettiPieces = [];
+        let isConfettiActive = false;
+
+        function setupConfetti() {
+            canvas = document.getElementById('confetti-canvas');
+            ctx = canvas.getContext('2d');
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        class Confetti {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * -canvas.height - 20;
+                this.size = Math.random() * 8 + 6;
+                this.color = `hsl(${Math.random() * 360}, 80%, 60%)`;
+                this.speed = Math.random() * 3 + 2;
+                this.angle = Math.random() * 360;
+                this.rotationSpeed = Math.random() * 4 - 2;
+            }
+
+            update() {
+                this.y += this.speed;
+                this.angle += this.rotationSpeed;
+                if (this.y > canvas.height) {
+                    if (isConfettiActive) {
+                        this.y = -20;
+                        this.x = Math.random() * canvas.width;
+                    } else {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate((this.angle * Math.PI) / 180);
+                ctx.fillStyle = this.color;
+                ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+                ctx.restore();
+            }
+        }
+
+        function createConfettiShower() {
+            confettiPieces = [];
+            for (let i = 0; i < 150; i++) {
+                confettiPieces.push(new Confetti());
+            }
+            requestAnimationFrame(animateConfetti);
+        }
+
+        function animateConfetti() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let alive = false;
+            confettiPieces.forEach(p => {
+                if (p.update()) {
+                    p.draw();
+                    alive = true;
+                }
+            });
+            if (alive || isConfettiActive) {
+                requestAnimationFrame(animateConfetti);
+            }
+        }
+    </script>
+</body>
+</html>
